@@ -89,11 +89,30 @@ def file_date(filename:str) -> tp.Union[datetime.datetime,None]:
     '''Extract the date from the file name
        e.g: CW_T001_L003_02.08.19_093548_022_CA.tiff -> 2019.08.02
     '''
-    try:
-        date_str = os.path.basename(filename).split('_')[3]
-        return datetime.datetime.strptime(date_str, '%d.%m.%y')
-    except:
-        return None
+    date_candidates = filename.split('_')
+    for datestring in date_candidates:
+        splits      = datestring.split('.')
+        try:
+            assert len( [int(s) for s in splits] ) == 3
+        except (ValueError, AssertionError):
+            #does not look like a date
+            continue
+        
+        (a,b,c) = splits
+        if len(a) > 2:
+            #interpreting as format YYYYMMDD
+            [y,m,d] = map(int, [a,b,c])
+        elif len(c) > 2:
+            #interpreting as format DDMMYYYY
+            [y,m,d] = map(int, [c,b,a])
+        else:
+            #interpreting as format DDMMYY
+            [y,m,d] = map(int, [c,b,a])
+            y       = (y+2000) if y<70 else (y+1900)    #1970-2069
+        date = datetime.datetime(y, m, d);
+        return date
+        
+
 
 def group_filenames(filenames:[str]) -> tp.Dict[str, tp.List[str]]:
     '''Sort filenames into groups with the same identifier'''

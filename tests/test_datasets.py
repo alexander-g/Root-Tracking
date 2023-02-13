@@ -58,4 +58,16 @@ def test_filename_parsing():
     assert groups['CW_T001_L003'] == filenames[:2][::-1]
 
 
+    filenames2 = [
+        'project_T18_L0_2020.07.27_124630_30_mpa-B.tiff',
+        'project_T18_L0_2021.06.27_124630_30_mpa-B.tiff'
+    ]
+
+    assert datasets.file_identifier(filenames2[0]) == 'project_T18_L0'
+    assert datasets.file_date(filenames2[0])       == datetime.datetime(year=2020, month=7, day=27)
+
+    groups = datasets.group_filenames(filenames2)
+    assert len(groups) == 1
+
+
 
