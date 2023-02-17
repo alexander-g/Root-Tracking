@@ -89,8 +89,7 @@ class UNet(torch.nn.Module):
             #first export
             importer = (torch.package.sys_importer,)
         with torch.package.PackageExporter(destination, importer) as pe:
-            #interns = [__name__.split('.')[-1]]+MODULES
-            interns = [__name__]+MODULES
+            interns = [ '.'.join(__name__.split('.')[1:]) if __name__.startswith('<torch') else __name__ ]
 
             pe.intern(interns)
             pe.intern(['torchvision.models.resnet.**'])
@@ -124,7 +123,7 @@ def normalize(x, axis=-3):
 def extract_descriptors(x, pts_yx:list, box_size=64, dsc_size=16):
     '''Extract patches from featuremap x at locations pts_yx'''
     pts_xy = [torch.flip(yx, dims=[1]) for yx in pts_yx]
-    boxes  = [torch.cat([xy-box_size//2, xy+box_size//2,], -1).float() for xy in pts_xy]
+    boxes  = [torch.cat([xy-box_size//2, xy+box_size//2,], -1).float().to(x.device) for xy in pts_xy]
     dsc    = torchvision.ops.roi_align(x, boxes, dsc_size, sampling_ratio=1)
     return dsc
 
@@ -228,7 +227,7 @@ class RootTrackingModel(UNet):
         p0,p1 = filter_points(result['points0'], result['points1'])
         result['points0'] = p0
         result['points1'] = p1
-        #TODO: success
+        result['success'] = (len(p0)>=1)
         return result
     
     def compute_descriptors_at_points(self, img, points, dev='cpu', **kw):
@@ -327,23 +326,28 @@ def bruteforce_match(
     return result
 
 
-def full_inference(imagefile0:str, imagefile1:str, segmentation_model:UNet, similarity_model:RootTrackingModel) -> dict:
+def full_inference(
+        imagefile0:str, 
+        imagefile1:str, 
+        segmentation_model:UNet, 
+        similarity_model:RootTrackingModel, 
+        **matching_kw
+    ) -> dict:
     img0 = UNet.load_image(imagefile0)
     img1 = UNet.load_image(imagefile1)
 
     seg0 = segmentation_model.process_image(img0)
     seg1 = segmentation_model.process_image(img1)
 
-    result         = similarity_model.match_images(img0, img1, seg0, seg1)
+    result         = similarity_model.match_images(img0, img1, seg0, seg1, **matching_kw)
     result['img0'] = imagefile0
     result['img1'] = imagefile1
 
-    #TODO: if success:
-
-    imap           = interpolation_map(result['points1'], result['points0'], seg0.shape)
-    warped_seg0    = warp(seg0, imap)
-    tmap           = create_turnover_map_rgba( warped_seg0>0.5, seg1>0.5, )
-    result['turnovermap'] = tmap[..., :3]
+    if result['success']:
+        imap           = interpolation_map(result['points1'], result['points0'], seg0.shape)
+        warped_seg0    = warp(seg0, imap)
+        tmap           = create_turnover_map_rgba( warped_seg0>0.5, seg1>0.5, )
+        result['turnovermap'] = tmap[..., :3]
 
     return result
 

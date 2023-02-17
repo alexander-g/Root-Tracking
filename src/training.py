@@ -119,7 +119,7 @@ def zero_out_if_close(x_mat, pts_list:list, threshold=8):
     x_mat     = x_mat.clone()
     for i,pts in enumerate(pts_list):
         dist_mat = torch.abs(pts[:,None] - pts[None]).sum(-1)   #L1 distance
-        ok_mat   = (dist_mat > threshold)
+        ok_mat   = (dist_mat > threshold).to(x_mat.device)
         x_mat[i] *= ok_mat
     return x_mat
 
